@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
 import Navbar from "../components/Navbar";
 import heart from "../assets/images/heart.png";
-import saaolLogo from "../assets/images/saaol_logo.png";
 
 // SVG icons
 import eecpIcon from "../assets/svgs/EECP.svg";
@@ -218,9 +217,6 @@ const Treatments = () => {
   return (
     <section ref={sectionRef} className="relative h-screen w-screen overflow-hidden bg-slate-50 flex flex-col justify-center select-none pb-4 lg:pb-0">
       <Navbar />
-      
-      {/* Absolute Logo matching Navbar */}
-      <img src={saaolLogo} alt="SAAOL Logo" className="fixed top-6 left-8 lg:left-16 w-16 lg:w-20 z-50 logo-img opacity-0" />
 
       {/* Main Parent Container - positioning two parts at corners */}
       <div className="w-full px-8 lg:px-16 flex flex-col justify-center flex-1 relative z-10 py-4 lg:py-6 mt-12 lg:mt-0">

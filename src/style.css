@@ -15,5 +15,18 @@
 }
 
 .bauhaus {
-  font-family: 'ITC Bauhaus', 'Bauhaus 93', sans-serif;
+  font-family: 'Roboto', sans-serif;
+}
+
+@keyframes infinite-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.infinite-track {
+  animation: infinite-scroll 30s linear infinite;
+}
+
+.infinite-track:hover {
+  animation-play-state: paused;
 }

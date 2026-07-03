@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import gsap from "gsap";
-import leftGradient from "../assets/images/left_gradient.png";
-import rightBottomGradient from "../assets/images/right_bottom_gradient.png";
-import saaolLogo from "../assets/images/saaol_logo.png";
-import heart from "../assets/images/heart.png";
-import dhaka from "../assets/images/dhaka.png";
+import leftGradient from "../../assets/images/left_gradient.png";
+import rightBottomGradient from "../../assets/images/right_bottom_gradient.png";
+import heart from "../../assets/images/heart.png";
+import dhaka from "../../assets/images/dhaka.png";
 import { Earth, HeartHandshake, MapPinned, UserStar } from "lucide-react";
-import Navbar from "../components/Navbar";
+import Navbar from "../../components/Navbar";
+import BookingModal from "../../components/BookingModal";
 
 const lines = ["LET US HEAL", "YOUR HEART", "NATURALLY..."];
 
@@ -28,9 +28,12 @@ const createAnimationTimeline = (
   infoRef: React.RefObject<HTMLDivElement | null>,
   buttonRef: React.RefObject<HTMLButtonElement | null>,
   config: AnimationConfig,
+  standalone: boolean = true,
 ) => {
   // Initialize all elements to be hidden BEFORE any rendering
-  gsap.set(".logo-img", { opacity: 0, y: -80 });
+  if (standalone) {
+    gsap.set(".logo-img", { opacity: 0, y: 80 });
+  }
   gsap.set(locationRef.current, { opacity: 0 });
   gsap.set(locationRef.current, { y: 100, scale: 0.8 });
   gsap.set(infoRef.current?.querySelectorAll(".info-item")!, {
@@ -59,7 +62,9 @@ const createAnimationTimeline = (
   );
 
   // Step 1: H1 animation - starts at config.h1StartTime
-  timeline.fromTo(".logo-img", { y: -80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, ease: "power3.out" }, config.h1StartTime);
+  if (standalone) {
+    timeline.fromTo(".logo-img", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8, ease: "power3.out" }, config.h1StartTime);
+  }
   const chars = h1Ref.current?.querySelectorAll(".char");
   if (chars) {
     timeline.fromTo(
@@ -140,9 +145,11 @@ const defaultAnimationConfig: AnimationConfig = {
 
 interface HeroProps {
   animationConfig?: Partial<AnimationConfig>;
+  standalone?: boolean;
+  onGoToHomeAbout?: () => void;
 }
 
-const Hero = ({ animationConfig }: HeroProps) => {
+const Hero = ({ animationConfig, standalone = true, onGoToHomeAbout }: HeroProps) => {
   const h1Ref = useRef<HTMLHeadingElement>(null);
   const heartRef = useRef<HTMLImageElement>(null);
   const locationRef = useRef<HTMLDivElement>(null);
@@ -151,6 +158,9 @@ const Hero = ({ animationConfig }: HeroProps) => {
   const sectionRef = useRef<HTMLElement>(null);
   const navigate = useNavigate();
   const scrollThrottle = useRef(false);
+  const scrollStartTime = useRef(0);
+  const scrollEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
 
   // Merge provided config with defaults
   const finalConfig: AnimationConfig = {
@@ -166,98 +176,120 @@ const Hero = ({ animationConfig }: HeroProps) => {
       infoRef,
       buttonRef,
       finalConfig,
+      standalone,
     );
-  }, [finalConfig]);
+  }, [finalConfig, standalone]);
 
-  // Scroll down to navigate to treatments page
+  // Scroll down to navigate to about page (triggers after 1s continuous scroll)
   const handleWheel = useCallback((e: WheelEvent) => {
     if (scrollThrottle.current) return;
+
     if (e.deltaY > 0) {
-      scrollThrottle.current = true;
+      if (!scrollStartTime.current) {
+        scrollStartTime.current = Date.now();
+      }
 
-      // Run GSAP exit animations
-      const exitTimeline = gsap.timeline({
-        onComplete: () => {
-          navigate("/treatments");
-          scrollThrottle.current = false;
+      if (scrollEndTimer.current) {
+        clearTimeout(scrollEndTimer.current);
+        scrollEndTimer.current = null;
+      }
+
+      if (Date.now() - scrollStartTime.current >= 100) {
+        scrollThrottle.current = true;
+        scrollStartTime.current = 0;
+
+        // Run GSAP exit animations
+        const exitTimeline = gsap.timeline({
+          onComplete: () => {
+            if (standalone) {
+              navigate("/about");
+            } else {
+              onGoToHomeAbout?.();
+            }
+            scrollThrottle.current = false;
+          }
+        });
+
+        const totalDuration = 1.6;
+
+        if (standalone) {
+          exitTimeline.to("nav", { y: -100, opacity: 0, duration: totalDuration, ease: "power2.inOut" }, 0);
+          exitTimeline.to(".logo-img", { y: -80, opacity: 0, duration: totalDuration, ease: "power2.inOut" }, 0);
         }
-      });
 
-      // All animations unified to 1.6s total to perfectly match the h1 stagger duration
-      const totalDuration = 1.6;
+        const chars = h1Ref.current?.querySelectorAll(".char");
+        if (chars && chars.length > 0) {
+          exitTimeline.to(chars, {
+            y: -60,
+            opacity: 0,
+            rotateX: 90,
+            duration: 0.5,
+            stagger: 0.025,
+            ease: "power2.inOut"
+          }, 0);
+        }
 
-      // 1. navbar and logo will go up and vanish
-      exitTimeline.to("nav", { y: -100, opacity: 0, duration: totalDuration, ease: "power2.inOut" }, 0);
-      exitTimeline.to(".logo-img", { y: -80, opacity: 0, duration: totalDuration, ease: "power2.inOut" }, 0);
-
-      // 2. h1 disappear animation (stagger across ~33 chars: 0.8 + 32*0.025 = 1.6s total)
-      const chars = h1Ref.current?.querySelectorAll(".char");
-      if (chars && chars.length > 0) {
-        exitTimeline.to(chars, {
-          y: -60,
+        exitTimeline.to(heartRef.current!, {
+          scale: 0.05,
           opacity: 0,
-          rotateX: 90,
-          duration: 0.5,
-          stagger: 0.025,
+          duration: totalDuration,
           ease: "power2.inOut"
         }, 0);
-      }
 
-      // 3. heart become small and vanish
-      exitTimeline.to(heartRef.current!, {
-        scale: 0.05,
-        opacity: 0,
-        duration: totalDuration,
-        ease: "power2.inOut"
-      }, 0);
-
-      // 4. country box (location box) become small and vanish
-      exitTimeline.to(locationRef.current!, {
-        scale: 0.05,
-        opacity: 0,
-        duration: totalDuration,
-        ease: "power2.inOut"
-      }, 0);
-
-      // 5. info list go left and vanish (4 items, stagger 0.04s, so base duration 1.48s = 1.6s total)
-      const infoItems = infoRef.current?.querySelectorAll(".info-item");
-      if (infoItems && infoItems.length > 0) {
-        exitTimeline.to(infoItems, {
-          x: -150,
+        exitTimeline.to(locationRef.current!, {
+          scale: 0.05,
           opacity: 0,
-          duration: 1.48,
-          stagger: 0.04,
+          duration: totalDuration,
           ease: "power2.inOut"
         }, 0);
+
+        const infoItems = infoRef.current?.querySelectorAll(".info-item");
+        if (infoItems && infoItems.length > 0) {
+          exitTimeline.to(infoItems, {
+            x: -150,
+            opacity: 0,
+            duration: 1.48,
+            stagger: 0.04,
+            ease: "power2.inOut"
+          }, 0);
+        }
+
+        exitTimeline.to(buttonRef.current!, {
+          y: 120,
+          opacity: 0,
+          duration: totalDuration,
+          ease: "power2.inOut"
+        }, 0);
+
+        exitTimeline.to(".left-grad-img", {
+          x: -400,
+          y: -400,
+          opacity: 0,
+          duration: totalDuration,
+          ease: "power2.inOut"
+        }, 0);
+
+        exitTimeline.to(".right-grad-img", {
+          x: 400,
+          y: 400,
+          opacity: 0,
+          duration: totalDuration,
+          ease: "power2.inOut"
+        }, 0);
+      } else {
+        scrollEndTimer.current = setTimeout(() => {
+          scrollStartTime.current = 0;
+          scrollEndTimer.current = null;
+        }, 300);
       }
-
-      // 6. button go down and vanish
-      exitTimeline.to(buttonRef.current!, {
-        y: 120,
-        opacity: 0,
-        duration: totalDuration,
-        ease: "power2.inOut"
-      }, 0);
-
-      // 7. left gradient image goes to left top corner and vanishes
-      exitTimeline.to(".left-grad-img", {
-        x: -400,
-        y: -400,
-        opacity: 0,
-        duration: totalDuration,
-        ease: "power2.inOut"
-      }, 0);
-
-      // 8. right gradient image goes to right bottom corner and vanishes
-      exitTimeline.to(".right-grad-img", {
-        x: 400,
-        y: 400,
-        opacity: 0,
-        duration: totalDuration,
-        ease: "power2.inOut"
-      }, 0);
+    } else {
+      scrollStartTime.current = 0;
+      if (scrollEndTimer.current) {
+        clearTimeout(scrollEndTimer.current);
+        scrollEndTimer.current = null;
+      }
     }
-  }, [navigate]);
+  }, [navigate, standalone, onGoToHomeAbout]);
 
   useEffect(() => {
     const el = sectionRef.current;
@@ -268,8 +300,7 @@ const Hero = ({ animationConfig }: HeroProps) => {
 
   return (
     <section ref={sectionRef} className="relative h-screen overflow-hidden">
-      <Navbar />
-      <img src={saaolLogo} alt="SAAOL Logo" className="fixed top-6 left-8 lg:left-16 w-16 lg:w-20 z-50 logo-img opacity-0" />
+      {standalone && <Navbar whiteLogo />}
       <img
         src={leftGradient}
         alt=""
@@ -289,8 +320,8 @@ const Hero = ({ animationConfig }: HeroProps) => {
 
       <div className="container relative z-10 mt-10 flex justify-between">
         <div>
-          <div className="mt-30 w-[580px]">
-            <h1 ref={h1Ref} className="text-8xl text-black bauhaus">
+          <div className="mt-30 w-full max-w-[600px]">
+            <h1 ref={h1Ref} className="text-5xl lg:text-[89px] text-white bauhaus">
               {lines.map((line, li) => (
                 <div key={li} className="overflow-hidden">
                   <div className="inline-block">
@@ -335,7 +366,8 @@ const Hero = ({ animationConfig }: HeroProps) => {
             {/* appoint button with premium gradient */}
             <button
               ref={buttonRef}
-              className="opacity-0 relative mt-2 cursor-pointer bg-gradient-to-r from-cyan-500 via-teal-500 to-green-500 hover:from-cyan-600 hover:via-teal-600 hover:to-green-600 text-white font-bold py-3 px-8 rounded-lg w-fit shadow-lg shadow-teal-400/30 hover:scale-105 active:scale-95"
+              onClick={() => setIsBookingOpen(true)}
+              className="opacity-0 relative mt-2 cursor-pointer bg-gradient-to-r from-cyan-500 via-cyan-500 to-blue-500 hover:from-cyan-600 hover:via-cyan-600 hover:to-blue-600 text-white font-bold py-3 px-8 rounded-lg w-fit shadow-lg shadow-teal-400/30 hover:scale-105 active:scale-95"
             >
               Book Your Appointment
             </button>
@@ -344,15 +376,16 @@ const Hero = ({ animationConfig }: HeroProps) => {
 
         {/* location box */}
         <div ref={locationRef} className="group mt-[500px] mr-[50px]">
-          <div className="cursor-pointer bg-gradient-to-br from-cyan-400/20 to-green-400/20 border border-cyan-300/40 shadow-2xl w-[250px] h-[250px] rounded-lg flex justify-center items-center relative overflow-hidden hover:from-cyan-400/30 hover:to-green-400/30 transition-all duration-300">
+          <div className="cursor-pointer bg-gradient-to-br from-cyan-400/20 to-blue-400/20 border border-cyan-300/40 shadow-2xl w-[250px] h-[250px] rounded-lg flex justify-center items-center relative overflow-hidden hover:from-cyan-400/30 hover:to-blue-400/30 transition-all duration-300">
             <img src={dhaka} alt="" className="w-34" />
-            <h2 className="absolute bg-gradient-to-br from-cyan-500/30 to-green-500/30 border border-cyan-300/40 text-slate-800 text-xl font-semibold rounded-lg w-[250px] h-[250px] flex items-center justify-center opacity-0 transition-all duration-500 group-hover:opacity-100">
+            <h2 className="absolute bg-gradient-to-br from-cyan-500/30 to-blue-500/30 border border-cyan-300/40 text-slate-800 text-xl font-semibold rounded-lg w-[250px] h-[250px] flex items-center justify-center opacity-0 transition-all duration-500 group-hover:opacity-100">
               Dhaka • Bangladesh
             </h2>
           </div>
         </div>
       </div>
 
+      <BookingModal isOpen={isBookingOpen} onClose={() => setIsBookingOpen(false)} />
     </section>
   );
 };
